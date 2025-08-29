@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Calcula tu ponderado UNTELS</title>
+  <style>
+    :root { --bg:#0a3d75; --card:#0f4d92; --txt:#fff; --muted:#dbeafe; --ok:#d1fae5; --warn:#fee2e2; }
+    *{box-sizing:border-box;font-family:system-ui,Segoe UI,Roboto,Arial}
+    body{margin:0;background:var(--bg);color:var(--txt)}
+    .wrap{max-width:1050px;margin:auto;padding:24px}
+    h1{font-weight:700;text-align:center;margin:8px 0 18px}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .card{background:var(--card);padding:16px;border-radius:14px;box-shadow:0 8px 20px rgba(0,0,0,.15)}
+    .row{display:flex;gap:8px;align-items:center}
+    label{font-size:.95rem;opacity:.9;width:120px}
+    input[type="number"]{width:100%;padding:10px;border-radius:10px;border:none}
+    input[type="range"]{width:100%}
+    .pill{display:inline-block;background:#0b63d1;color:#fff;padding:6px 10px;border-radius:999px;font-size:.85rem}
+    .muted{color:var(--muted)}
+    .result{font-size:1.4rem;font-weight:700;margin-top:4px}
+    .note{margin-top:10px;padding:12px;border-radius:12px}
+    .ok{background:var(--ok);color:#065f46}
+    .bad{background:var(--warn);color:#7f1d1d}
+    .foot{opacity:.9;font-size:.85rem;margin-top:14px}
+    @media (max-width:780px){ .grid{grid-template-columns:1fr} label{width:110px} }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Calcula tu ponderado UNTELS</h1>
+
+    <!-- Controles globales -->
+    <div class="card">
+      <div class="grid">
+        <div class="row"><label>Umbral aprobación</label>
+          <input id="umbral" type="number" step="0.1" value="11">
+        </div>
+        <div class="row"><label>Modo</label>
+          <select id="modo">
+            <option value="parcial">Parcial (lo que llevas)</option>
+            <option value="completo">Completo (todo el curso)</option>
+          </select>
+        </div>
+      </div>
+      <div class="foot">Tip: si aún no tienes alguna nota, déjala vacía. El cálculo usa solo los ítems con valor y normaliza por la suma de sus pesos.</div>
+    </div>
+
+    <!-- Notas a la izquierda -->
+    <div class="grid" style="margin-top:14px">
+      <div class="card">
+        <div class="row"><label>EC1</label><input id="EC1" type="number" step="0.1" min="0" max="20" placeholder="ej. 12"></div>
+        <div class="row"><label>EC2</label><input id="EC2" type="number" step="0.1" min="0" max="20" placeholder="ej. 18"></div>
+        <div class="row"><label>Parcial</label><input id="Parcial" type="number" step="0.1" min="0" max="20" placeholder="ej. 15"></div>
+        <div class="row"><label>EC3</label><input id="EC3" type="number" step="0.1" min="0" max="20" placeholder="ej. 16"></div>
+        <div class="row"><label>EC4</label><input id="EC4" type="number" step="0.1" min="0" max="20" placeholder="ej. 14"></div>
+        <div class="row"><label>TA</label><input id="TA" type="number" step="0.1" min="0" max="20" placeholder="Trabajos/Aux."></div>
+        <div class="row"><label>Final</label><input id="Final" type="number" step="0.1" min="0" max="20" placeholder="Examen final"></div>
+      </div>
+
+      <!-- Pesos a la derecha -->
+      <div class="card">
+        <div class="row"><label>Peso EC1 (%)</label><input id="w_EC1" type="number" step="1" min="0" max="100" value="10"></div>
+        <div class="row"><label>Peso EC2 (%)</label><input id="w_EC2" type="number" step="1" min="0" max="100" value="10"></div>
+        <div class="row"><label>Peso Parcial (%)</label><input id="w_Parcial" type="number" step="1" min="0" max="100" value="25"></div>
+        <div class="row"><label>Peso EC3 (%)</label><input id="w_EC3" type="number" step="1" min="0" max="100" value="10"></div>
+        <div class="row"><label>Peso EC4 (%)</label><input id="w_EC4" type="number" step="1" min="0" max="100" value="10"></div>
+        <div class="row"><label>Peso TA (%)</label><input id="w_TA" type="number" step="1" min="0" max="100" value="10"></div>
+        <div class="row"><label>Peso Final (%)</label><input id="w_Final" type="number" step="1" min="0" max="100" value="25"></div>
+        <div class="foot">Ajusta los pesos al reglamento de tu curso. Para <b>Parcial</b> puedes poner 0% a los ítems que aún no cuentan.</div>
+      </div>
+    </div>
+
+    <!-- Resultado -->
+    <div class="card" id="panel-resultado" style="margin-top:14px">
+      <span class="pill">Ponderado por ahora</span>
+      <div class="result" id="resultado">—</div>
+      <div id="mensaje" class="note" style="display:none"></div>
+      <div class="foot">Suma de pesos usados: <span id="suma-pesos">0</span>% (normalizados según notas presentes)</div>
+      <button id="btn-borrar" style="margin-top:10px;padding:10px 14px;border:none;border-radius:10px;cursor:pointer">Borrar todo</button>
+    </div>
+  </div>
+
+  <script>
+    const ids = ["EC1","EC2","Parcial","EC3","EC4","TA","Final",
+                 "w_EC1","w_EC2","w_Parcial","w_EC3","w_EC4","w_TA","w_Final",
+                 "umbral","modo"];
+    const $ = id => document.getElementById(id);
+
+    // Cargar de localStorage
+    ids.forEach(id=>{
+      const v = localStorage.getItem("calc_"+id);
+      if(v !== null) $(id).value = v;
+    });
+
+    ids.forEach(id => $(id).addEventListener("input", calc));
+    $("btn-borrar").addEventListener("click", ()=>{
+      ids.forEach(id=>localStorage.removeItem("calc_"+id));
+      ids.forEach(id=>{ if($(id).type==="number") $(id).value = ""; });
+      $("resultado").textContent = "—";
+      $("mensaje").style.display = "none";
+      $("suma-pesos").textContent = "0";
+    });
+
+    function calc(){
+      // Guardar
+      ids.forEach(id=>localStorage.setItem("calc_"+id, $(id).value));
+
+      const notas = { EC1:v("EC1"), EC2:v("EC2"), Parcial:v("Parcial"),
+                      EC3:v("EC3"), EC4:v("EC4"), TA:v("TA"), Final:v("Final") };
+      const pesos = { EC1:v("w_EC1"), EC2:v("w_EC2"), Parcial:v("w_Parcial"),
+                      EC3:v("w_EC3"), EC4:v("w_EC4"), TA:v("w_TA"), Final:v("w_Final") };
+
+      // Usar solo ítems con nota (no vacío) y con peso > 0
+      let num=0, den=0;
+      for(const k of Object.keys(notas)){
+        const nota = notas[k];
+        const peso = pesos[k];
+        if(!isNaN(nota) && !isNaN(peso) && peso>0){
+          num += nota * peso;
+          den += peso;
+        }
+      }
+      $("suma-pesos").textContent = den.toFixed(0);
+
+      if(den===0){ $("resultado").textContent = "—"; $("mensaje").style.display="none"; return; }
+
+      const prom = num/den; // normalizado a 0–20
+      $("resultado").textContent = prom.toFixed(2);
+
+      const umbral = Number($("umbral").value||11);
+      const msg = prom >= umbral
+        ? {text:"No necesitas susti 🎉", cls:"ok"}
+        : {text:"Aún podrías tomar susti si el reglamento lo permite.", cls:"bad"};
+
+      const box = $("mensaje");
+      box.className = "note "+(prom>=umbral?"ok":"bad");
+      box.textContent = msg.text;
+      box.style.display = "block";
+    }
+
+    function v(id){ const x = Number($(id).value.replace(",", ".")); return isNaN(x)?NaN:x; }
+
+    // Primer cálculo
+    calc();
+  </script>
+</body>
+</html>
